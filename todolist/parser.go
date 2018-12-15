@@ -11,19 +11,37 @@ import (
 
 type Parser struct{}
 
-func (p *Parser) ParseNewTodo(input string) *Todo {
+func (p *Parser) ParseNewTodoSingle(input string) *TodoSingle {
 	r, _ := regexp.Compile(`^(add|a)(\s*|)`)
 	input = r.ReplaceAllString(input, "")
 	if input == "" {
 		return nil
 	}
 
-	todo := NewTodo()
+	todo := NewTodoSingle()
 	todo.Subject = p.Subject(input)
 	todo.Projects = p.Projects(input)
 	todo.Contexts = p.Contexts(input)
 	if p.hasDue(input) {
 		todo.Due = p.Due(input, time.Now())
+	}
+	return todo
+}
+
+func (p *Parser) ParseNewTodoRepeat(input string) *TodoRepeat {
+	r, _ := regexp.Compile(`^(add|a)(\s*|)`)
+	input = r.ReplaceAllString(input, "")
+	if input == "" {
+		return nil
+	}
+
+	todo := NewTodoRepeat()
+	todo.Subject = p.Subject(input)
+	todo.Projects = p.Projects(input)
+	todo.Contexts = p.Contexts(input)
+	if p.hasRepeat(input) {
+		todo.RepeatStart, todo.RepeatType = p.Repeat(input, time.Now())
+		fmt.Println("start rep: " + todo.RepeatStart)
 	}
 	return todo
 }
@@ -49,9 +67,34 @@ func (p *Parser) ParseEditTodo(todo *Todo, input string) bool {
 	return true
 }
 
+func (p *Parser) ParseEditTodoRepeat(todo *TodoRepeat, input string) bool {
+	r := regexp.MustCompile(`(\w+)\s+(\d+)(\s+(.*))?`)
+	matches := r.FindStringSubmatch(input)
+	if len(matches) < 3 {
+		fmt.Println("Could not match command or id")
+		return false
+	}
+
+	subjectOnly := matches[3]
+
+	if p.Subject(subjectOnly) != "" {
+		todo.Subject = p.Subject(subjectOnly)
+		todo.Projects = p.Projects(subjectOnly)
+		todo.Contexts = p.Contexts(subjectOnly)
+	}
+	if p.hasRepeat(subjectOnly) {
+		todo.RepeatStart, todo.RepeatType = p.Repeat(subjectOnly, time.Now())
+	}
+	return true
+}
+
+// Subject checks the given input for keywords " due" or " repeat" and returns input trimmed by these keywords
 func (p *Parser) Subject(input string) string {
 	if strings.Contains(input, " due") {
 		index := strings.LastIndex(input, " due")
+		return strings.TrimSpace(input[0:index])
+	} else if strings.Contains(input, " repeat") {
+		index := strings.LastIndex(input, " repeat")
 		return strings.TrimSpace(input[0:index])
 	} else {
 		return strings.TrimSpace(input)
@@ -70,11 +113,13 @@ func (p *Parser) ExpandProject(input string) string {
 	return project[len(project)-1]
 }
 
+// Projects checks if input string contains a sequence with starting character '+', then any number of latin characters, digits, _ or - ignoring any regex compiling errors
 func (p *Parser) Projects(input string) []string {
 	r, _ := regexp.Compile(`\+[\p{L}\d_-]+`)
 	return p.matchWords(input, r)
 }
 
+// Contexts checks if input string contains a sequence with starting character '@', then any number of latin characters, digits or _
 func (p *Parser) Contexts(input string) []string {
 	r, err := regexp.Compile(`\@[\p{L}\d_]+`)
 	if err != nil {
@@ -195,6 +240,37 @@ func (p *Parser) Due(input string, day time.Time) string {
 		return getNearestMonday(n).AddDate(0, 0, 7).Format("2006-01-02")
 	}
 	return p.parseArbitraryDate(res, time.Now())
+}
+
+func (p *Parser) hasRepeat(input string) bool {
+	r1, _ := regexp.Compile(`\srepeat (\w| )+$`)
+	r2, _ := regexp.Compile(`\srepeat (\w| )+(\d| )+$`)
+	r3, _ := regexp.Compile(`\srepeat (\w| )+(\d| )+(\w| )+$`)
+	return (r1.MatchString(input) || r2.MatchString(input) || r3.MatchString(input))
+}
+
+func (p *Parser) Repeat(input string, day time.Time) (string, string) {
+	r, _ := regexp.Compile(`repeat .*$`)
+
+	res := r.FindString(input)
+	res = res[7:]
+	ar := strings.Index(res, " ") + 1
+	switch res[:ar-1] {
+	case "none":
+		return "", "undefined"
+	case "day", "d":
+		return p.parseArbitraryDate(res[ar:], time.Now()), "day"
+	case "week", "w":
+		return p.parseArbitraryDate(res[ar:], time.Now()), "week"
+	case "month-day", "md":
+		return p.parseArbitraryDate(res[ar:], time.Now()), "month-day"
+	case "month-weekday", "mw":
+		return p.parseArbitraryDate(res[ar:], time.Now()), "month-weekday"
+	case "year", "y":
+		return p.parseArbitraryDate(res[ar:], time.Now()), "year"
+	default:
+		return "", "undefined"
+	}
 }
 
 func (p *Parser) parseArbitraryDate(_date string, pivot time.Time) string {

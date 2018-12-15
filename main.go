@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/MJacred/todolist/todolist"
 	"github.com/fatih/color"
-	"github.com/gammons/todolist/todolist"
 	"github.com/skratchdot/open-golang/open"
 )
 

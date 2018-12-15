@@ -34,7 +34,7 @@ func (f *FileStore) Initialize() {
 	fmt.Println("Todo repo initialized.")
 }
 
-func (f *FileStore) Load() ([]*Todo, error) {
+func (f *FileStore) Load() ([]*TodoSingle, []*TodoRepeat, error) {
 	if f.FileLocation == "" {
 		f.FileLocation = getLocation()
 	}
@@ -44,23 +44,34 @@ func (f *FileStore) Load() ([]*Todo, error) {
 		fmt.Println("No todo file found!")
 		fmt.Println("Initialize a new todo repo by running 'todolist init'")
 		os.Exit(0)
-		return nil, err
+		return nil, nil, err
 	}
 
-	var todos []*Todo
-	jerr := json.Unmarshal(data, &todos)
+	var todoSingles []*TodoSingle
+	jerr := json.Unmarshal(data, &todoSingles)
 	if jerr != nil {
 		fmt.Println("Error reading json data", jerr)
 		os.Exit(1)
-		return nil, jerr
+		return nil, nil, jerr
 	}
+
+	var todoRepeats []*TodoRepeat
+	jerr = json.Unmarshal(data, &todoRepeats)
+	if jerr != nil {
+		fmt.Println("Error reading json data", jerr)
+		os.Exit(1)
+		return nil, nil, jerr
+	}
+
 	f.Loaded = true
 
-	return todos, nil
+	return todoSingles, todoRepeats, nil
 }
 
-func (f *FileStore) Save(todos []*Todo) {
-	data, _ := json.Marshal(todos)
+func (f *FileStore) Save(todoSingles []*TodoSingle, todoRepeats []*TodoRepeat) {
+	data, _ := json.Marshal(todoSingles)
+	data2, _ := json.Marshal(todoRepeats)
+	data = append(data, data2...)
 	if err := ioutil.WriteFile(f.FileLocation, []byte(data), 0644); err != nil {
 		fmt.Println("Error writing json file", err)
 	}

@@ -29,36 +29,69 @@ func (a *App) InitializeRepo() {
 func (a *App) AddTodo(input string) {
 	a.Load()
 	parser := &Parser{}
-	todo := parser.ParseNewTodo(input)
-	if todo == nil {
-		fmt.Println("I need more information. Try something like 'todo a chat with @bob due tom'")
-		return
-	}
 
-	id := a.TodoList.NextId()
-	a.TodoList.Add(todo)
-	a.Save()
-	fmt.Printf("Todo %d added.\n", id)
+	isSingle := !parser.hasRepeat(input)
+
+	if isSingle {
+		todoSingle := parser.ParseNewTodoSingle(input)
+		if todoSingle == nil {
+			fmt.Println("I need more information. Try something like 'todo a chat with @bob due tom'")
+			return
+		}
+
+		id := a.TodoList.NextId()
+		a.TodoList.AddTodoSingle(todoSingle)
+		a.Save()
+		fmt.Printf("Todo %d added.\n", id)
+	} else {
+		todoRepeat := parser.ParseNewTodoRepeat(input)
+		if todoRepeat == nil {
+			fmt.Println("I need more information. Try something like 'todo a chat with @bob due tom'")
+			return
+		}
+
+		id := a.TodoList.NextId()
+		a.TodoList.AddTodoRepeat(todoRepeat)
+		a.Save()
+		fmt.Printf("Repeating Todo %d added.\n", id)
+	}
 }
 
-// AddDoneTodo Adds a todo and immediately completed it.
+// AddDoneTodo Adds a todo and immediately sets it to completed.
 func (a *App) AddDoneTodo(input string) {
 	a.Load()
 
 	r, _ := regexp.Compile(`^(done)(\s*|)`)
 	input = r.ReplaceAllString(input, "")
 	parser := &Parser{}
-	todo := parser.ParseNewTodo(input)
-	if todo == nil {
-		fmt.Println("I need more information. Try something like 'todo done chating with @bob'")
-		return
-	}
 
-	id := a.TodoList.NextId()
-	a.TodoList.Add(todo)
-	a.TodoList.Complete(id)
-	a.Save()
-	fmt.Printf("Completed Todo %d added.\n", id)
+	isSingle := !parser.hasRepeat(input)
+
+	if isSingle {
+		todo := parser.ParseNewTodoSingle(input)
+		if todo == nil {
+			fmt.Println("I need more information. Try something like 'todo done chating with @bob'")
+			return
+		}
+
+		id := a.TodoList.NextId()
+		a.TodoList.AddTodoSingle(todo)
+		a.TodoList.CompleteTodoSingles(id)
+		a.Save()
+		fmt.Printf("Added and completed Todo %d.\n", id)
+	} else {
+		todo := parser.ParseNewTodoRepeat(input)
+		if todo == nil {
+			fmt.Println("I need more information. Try something like 'todo done chating with @bob'")
+			return
+		}
+
+		id := a.TodoList.NextId()
+		a.TodoList.AddTodoRepeat(todo)
+		a.TodoList.CompleteTodoRepeats(id)
+		a.Save()
+		fmt.Printf("Added and completed Repeating Todo %d.\n", id)
+	}
 }
 
 func (a *App) DeleteTodo(input string) {
@@ -78,6 +111,7 @@ func (a *App) CompleteTodo(input string) {
 	if len(ids) == 0 {
 		return
 	}
+	// TODO: differentiate type
 	a.TodoList.Complete(ids...)
 	a.Save()
 	fmt.Println("Todo completed.")
@@ -89,6 +123,7 @@ func (a *App) UncompleteTodo(input string) {
 	if len(ids) == 0 {
 		return
 	}
+	// TODO: differentiate type
 	a.TodoList.Uncomplete(ids...)
 	a.Save()
 	fmt.Println("Todo uncompleted.")
@@ -193,6 +228,7 @@ func (a *App) HandleNotes(input string) {
 func (a *App) ArchiveCompleted() {
 	a.Load()
 	for _, todo := range a.TodoList.Todos() {
+		// TODO: differentiate type
 		if todo.Completed {
 			todo.Archive()
 		}
@@ -302,14 +338,14 @@ func (a *App) GarbageCollect() {
 }
 
 func (a *App) Load() error {
-	todos, err := a.TodoStore.Load()
+	todoSingles, todoRepeats, err := a.TodoStore.Load()
 	if err != nil {
 		return err
 	}
-	a.TodoList.Load(todos)
+	a.TodoList.Load(todoSingles, todoRepeats)
 	return nil
 }
 
 func (a *App) Save() {
-	a.TodoStore.Save(a.TodoList.Data)
+	a.TodoStore.Save(a.TodoList.Data, a.TodoList.DataRepeat)
 }

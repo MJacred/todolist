@@ -1,7 +1,8 @@
 package todolist
 
 type MemoryStore struct {
-	Todos []*Todo
+	TodoSingles []*TodoSingle
+	TodoRepeats []*TodoRepeat
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -10,10 +11,11 @@ func NewMemoryStore() *MemoryStore {
 
 func (m *MemoryStore) Initialize() {}
 
-func (m *MemoryStore) Load() ([]*Todo, error) {
-	return m.Todos, nil
+func (m *MemoryStore) Load() ([]*TodoSingle, []*TodoRepeat, error) {
+	return m.TodoSingles, m.TodoRepeats, nil
 }
 
-func (m *MemoryStore) Save(todos []*Todo) {
-	m.Todos = todos
+func (m *MemoryStore) Save(todoSingles []*TodoSingle, todoRepeats []*TodoRepeat) {
+	m.TodoSingles = todoSingles
+	m.TodoRepeats = todoRepeats
 }

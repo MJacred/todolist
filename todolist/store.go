@@ -2,6 +2,6 @@ package todolist
 
 type Store interface {
 	Initialize()
-	Load() ([]*Todo, error)
-	Save(todos []*Todo)
+	Load() ([]*TodoSingle, []*TodoRepeat, error)
+	Save(todoSingles []*TodoSingle, todoRepeats []*TodoRepeat)
 }
